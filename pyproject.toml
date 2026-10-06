@@ -1,0 +1,54 @@
+[build-system]
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ssml-h-tools"
+version = "0.1.0"
+description = "Engine-neutral parser, validator, and builder for SSML-H and bounded SSML"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.10"
+authors = [{name = "Hangry Labs"}]
+keywords = ["ssml", "ssml-h", "text-to-speech", "speech-synthesis", "xml"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Multimedia :: Sound/Audio :: Speech",
+    "Typing :: Typed",
+]
+dependencies = ["defusedxml>=0.7.1,<0.8"]
+
+[project.optional-dependencies]
+test = [
+    "build>=1.3,<2",
+    "ruff>=0.16,<0.17",
+    "twine>=6.2,<7",
+]
+
+[project.urls]
+Homepage = "https://hangrylabs.app/ns/ssml-h/1.0"
+Documentation = "https://hangrylabs.app/ns/ssml-h/1.0"
+Repository = "https://github.com/hangry-labs/ssml-h-tools"
+Issues = "https://github.com/hangry-labs/ssml-h-tools/issues"
+Specification = "https://github.com/hangry-labs/ssml-h-spec"
+
+[tool.hatch.build.targets.sdist]
+include = ["src/ssml_h", "tests", "docs", "README.md", "LICENSE", "NOTICE", "CHANGELOG.md"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ssml_h"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "B", "RUF", "UP"]

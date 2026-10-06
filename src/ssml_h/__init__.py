@@ -1,0 +1,53 @@
+"""Parser, validator, and builder tools for SSML and SSML-H."""
+
+from .builder import SSMLBuilder, SSMLNode, VoiceDefinition
+from .parser import (
+    MAX_BREAK_MS,
+    MAX_PHONEME_CHARACTERS,
+    MAX_SSML_ELEMENTS,
+    MAX_SSML_NESTING,
+    MAX_SSML_SOURCE_CHARACTERS,
+    MAX_SSML_UNITS,
+    MAX_SSML_VOICE_DEFINITIONS,
+    MAX_TOTAL_BREAK_MS,
+    MAX_VOICE_DESCRIPTION_CHARACTERS,
+    MAX_VOICE_SAMPLE_CHARACTERS,
+    SSML_H_NAMESPACE,
+    SSML_NAMESPACE,
+    SSMLPlan,
+    SSMLProsody,
+    SSMLUnit,
+    SSMLValidationError,
+    SSMLVoiceDefinition,
+    compile_ssml,
+    ssml_capabilities,
+    validate_ssml,
+)
+
+__all__ = [
+    "MAX_BREAK_MS",
+    "MAX_PHONEME_CHARACTERS",
+    "MAX_SSML_ELEMENTS",
+    "MAX_SSML_NESTING",
+    "MAX_SSML_SOURCE_CHARACTERS",
+    "MAX_SSML_UNITS",
+    "MAX_SSML_VOICE_DEFINITIONS",
+    "MAX_TOTAL_BREAK_MS",
+    "MAX_VOICE_DESCRIPTION_CHARACTERS",
+    "MAX_VOICE_SAMPLE_CHARACTERS",
+    "SSML_H_NAMESPACE",
+    "SSML_NAMESPACE",
+    "SSMLBuilder",
+    "SSMLNode",
+    "SSMLPlan",
+    "SSMLProsody",
+    "SSMLUnit",
+    "SSMLValidationError",
+    "SSMLVoiceDefinition",
+    "VoiceDefinition",
+    "compile_ssml",
+    "ssml_capabilities",
+    "validate_ssml",
+]
+
+__version__ = "0.1.0"

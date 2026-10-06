@@ -1,0 +1,8 @@
+SSML-H Tools
+Copyright 2026 Hangry Labs
+
+This product implements parts of the SSML-H specification maintained at:
+https://github.com/hangry-labs/ssml-h-spec
+
+SSML-H is based on W3C Speech Synthesis Markup Language (SSML) 1.1 but is not
+a W3C Recommendation and is not endorsed by W3C.
