@@ -17,6 +17,7 @@ plan = validate_ssml(
     resolve_language=resolve_language,
     validate_voice=validate_voice,
     render_phoneme=render_phoneme,
+    allow_turn_direction=model_supports_turn_direction,
 )
 ```
 
@@ -41,10 +42,20 @@ alphabet to the text representation expected by the model. Omit the callback
 to reject `<phoneme>` completely. Never accept an alphabet merely because the
 XML syntax is valid.
 
+### Turn direction
+
+Set `allow_turn_direction=True` only when the active processor can execute a
+bounded natural-language delivery instruction. Each affected speech unit then
+carries `unit.direction`. The host must preserve the resolved voice, must not
+speak or persist the instruction, and must reject model conditioning
+combinations it cannot honor. A nested `<voice>` has no direction unless it
+declares its own namespaced `h:direction` attribute.
+
 ## Execution boundary
 
 Execute `plan.units` in order. A `speech` unit carries text, language, voice,
-and composed prosody. A `break` unit carries bounded silence in milliseconds.
+composed prosody, and optional per-turn direction. A `break` unit carries
+bounded silence in milliseconds.
 Apply model-specific ranges before inference and reject values the processor
 cannot honor.
 
@@ -66,5 +77,6 @@ rules. A streaming disconnect is not a successful profile transaction.
 Start with `ssml_capabilities()` and narrow the result to what the active
 processor can execute. Supply only configured phoneme alphabets and set
 `description_supported=False` when the model cannot consume free-form voice
-descriptions. Add model-specific descriptor values and operational limits in
-the host API rather than the portable package.
+descriptions. Set `turn_direction_supported=True` only when the execution
+adapter consumes `unit.direction`. Add model-specific descriptor values and
+operational limits in the host API rather than the portable package.

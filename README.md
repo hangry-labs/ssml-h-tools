@@ -66,17 +66,25 @@ document.define_voice(
 
 with document.voice("Bob") as bob:
     bob.text("Are we ready?")
+with document.voice("Bob", direction="Calm and reassuring") as bob:
+    bob.text("Everything is under control.")
 document.break_(milliseconds=300)
 with document.prosody(rate="slow") as slower:
     slower.text("Everything is prepared.")
 
 xml = document.build()
-plan = document.validate()
+plan = document.validate(allow_turn_direction=True)
 ```
 
 XML is built with `ElementTree`; text and attributes are escaped rather than
 concatenated. `scope="profile"` must be requested explicitly when defining a
 persistent voice.
+
+Per-turn natural-language direction is an optional processor capability. The
+parser rejects `h:direction` unless the host explicitly passes
+`allow_turn_direction=True`; compiled speech units then expose the normalized
+instruction as `unit.direction`. The builder emits the namespaced attribute
+through `voice(..., direction="...")` only for SSML-H documents.
 
 ## Processor adapters
 
@@ -92,6 +100,8 @@ The host remains responsible for:
 - advertising its actual capabilities;
 - creating and cleaning request-scoped voices;
 - atomically publishing persistent profiles; and
+- executing advertised per-turn directions without speaking or persisting the
+  instruction; and
 - enforcing model, queue, duration, and output limits.
 
 ## Development

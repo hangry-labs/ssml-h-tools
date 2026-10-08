@@ -14,6 +14,7 @@ SSML_NAMESPACE = "http://www.w3.org/2001/10/synthesis"
 SSML_H_NAMESPACE = "https://hangrylabs.app/ns/ssml-h/1.0"
 XML_NAMESPACE = "http://www.w3.org/XML/1998/namespace"
 XML_LANGUAGE_ATTRIBUTE = f"{{{XML_NAMESPACE}}}lang"
+XML_DIRECTION_ATTRIBUTE = f"{{{SSML_H_NAMESPACE}}}direction"
 
 MAX_SSML_SOURCE_CHARACTERS = 50_000
 MAX_SSML_ELEMENTS = 300
@@ -25,6 +26,7 @@ MAX_TOTAL_BREAK_MS = 60_000
 MAX_VOICE_SAMPLE_CHARACTERS = 500
 MAX_VOICE_DESCRIPTION_CHARACTERS = 500
 MAX_PHONEME_CHARACTERS = 300
+MAX_TURN_DIRECTION_CHARACTERS = 240
 
 VOICE_NAME_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9._-]{0,63}$")
 BREAK_PATTERN = re.compile(r"^(\d+(?:\.\d+)?)(ms|s)$", re.IGNORECASE)
@@ -137,6 +139,7 @@ class SSMLUnit:
     language_explicit: bool = False
     voice: str | None = None
     prosody: SSMLProsody = field(default_factory=SSMLProsody)
+    direction: str | None = None
 
 
 @dataclass(frozen=True)
@@ -160,6 +163,7 @@ class _Context:
     language_explicit: bool
     voice: str | None
     prosody: SSMLProsody = field(default_factory=SSMLProsody)
+    direction: str | None = None
 
 
 def _qualified_name(value: str) -> tuple[str, str]:
@@ -187,6 +191,39 @@ def _require_attributes(element, allowed: set[str]) -> dict[str, str]:
         del namespace
         raise SSMLValidationError(f"Unsupported attribute(s) on <{local}>: {', '.join(unknown)}.")
     return attributes
+
+
+def _voice_attributes(
+    element,
+    input_type: Literal["ssml", "ssml-h"],
+    allow_turn_direction: bool,
+) -> tuple[dict[str, str], str | None]:
+    direction: str | None = None
+    standard_attributes: dict[str, str] = {}
+    for name, value in element.attrib.items():
+        namespace, local = _qualified_name(name)
+        if name == XML_DIRECTION_ATTRIBUTE:
+            if input_type != "ssml-h":
+                raise SSMLValidationError("h:direction requires input_type='ssml-h'.")
+            if not allow_turn_direction:
+                raise SSMLValidationError(
+                    "SSML-H h:direction is not enabled by this processor profile."
+                )
+            direction = " ".join(value.split()).strip()
+            if not direction:
+                raise SSMLValidationError("SSML-H h:direction must not be empty.")
+            if len(direction) > MAX_TURN_DIRECTION_CHARACTERS:
+                raise SSMLValidationError(
+                    f"SSML-H h:direction is limited to {MAX_TURN_DIRECTION_CHARACTERS} characters."
+                )
+            continue
+        if namespace:
+            raise SSMLValidationError(f"Unsupported namespaced attribute '{name}'.")
+        standard_attributes[local] = value
+    unknown = sorted(set(standard_attributes) - {"name", "required"})
+    if unknown:
+        raise SSMLValidationError(f"Unsupported attribute(s) on <voice>: {', '.join(unknown)}.")
+    return standard_attributes, direction
 
 
 def _plain_text(element, element_name: str, limit: int | None = None) -> str:
@@ -414,7 +451,11 @@ def _prosody_context(element, context: _Context) -> _Context:
     if not 0.0 <= volume <= 4.0:
         raise SSMLValidationError("Composed SSML prosody volume must be between 0 and 4.0.")
     return _Context(
-        context.language, context.language_explicit, context.voice, SSMLProsody(rate, pitch, volume)
+        context.language,
+        context.language_explicit,
+        context.voice,
+        SSMLProsody(rate, pitch, volume),
+        context.direction,
     )
 
 
@@ -440,6 +481,7 @@ def _append_speech(units: list[SSMLUnit], text: str, context: _Context) -> None:
             and previous.language_explicit == context.language_explicit
             and previous.voice == context.voice
             and previous.prosody == context.prosody
+            and previous.direction == context.direction
         ):
             units[-1] = SSMLUnit(
                 "speech",
@@ -448,6 +490,7 @@ def _append_speech(units: list[SSMLUnit], text: str, context: _Context) -> None:
                 language_explicit=context.language_explicit,
                 voice=context.voice,
                 prosody=context.prosody,
+                direction=context.direction,
             )
             return
     units.append(
@@ -458,6 +501,7 @@ def _append_speech(units: list[SSMLUnit], text: str, context: _Context) -> None:
             language_explicit=context.language_explicit,
             voice=context.voice,
             prosody=context.prosody,
+            direction=context.direction,
         )
     )
 
@@ -507,6 +551,7 @@ def compile_ssml(
     resolve_language: LanguageResolver | None = None,
     validate_voice: VoiceValidator | None = None,
     render_phoneme: PhonemeRenderer | None = None,
+    allow_turn_direction: bool = False,
 ) -> SSMLPlan:
     if len(document) > MAX_SSML_SOURCE_CHARACTERS:
         raise SSMLValidationError(
@@ -592,10 +637,15 @@ def compile_ssml(
                         language_explicit=context.language_explicit,
                         voice=context.voice,
                         prosody=context.prosody,
+                        direction=context.direction,
                     )
                 )
             elif tag == "voice":
-                attributes = _require_attributes(element, {"name", "required"})
+                attributes, direction = _voice_attributes(
+                    element,
+                    input_type,
+                    allow_turn_direction,
+                )
                 name = attributes.get("name", "").strip()
                 if not name:
                     raise SSMLValidationError("<voice> requires a non-empty name attribute.")
@@ -610,7 +660,13 @@ def compile_ssml(
                         raise SSMLValidationError(str(exc)) from exc
                 walk(
                     element,
-                    _Context(context.language, context.language_explicit, name, context.prosody),
+                    _Context(
+                        context.language,
+                        context.language_explicit,
+                        name,
+                        context.prosody,
+                        direction,
+                    ),
                     depth + 1,
                 )
             elif tag == "lang":
@@ -622,7 +678,11 @@ def compile_ssml(
                     resolved = resolve_language(requested) if resolve_language else requested
                 except ValueError as exc:
                     raise SSMLValidationError(str(exc)) from exc
-                walk(element, _Context(resolved, True, context.voice, context.prosody), depth + 1)
+                walk(
+                    element,
+                    _Context(resolved, True, context.voice, context.prosody, context.direction),
+                    depth + 1,
+                )
             elif tag == "prosody":
                 walk(element, _prosody_context(element, context), depth + 1)
             elif tag in {"p", "s"}:
@@ -638,7 +698,13 @@ def compile_ssml(
                         )
                     except ValueError as exc:
                         raise SSMLValidationError(str(exc)) from exc
-                    nested_context = _Context(resolved, True, context.voice, context.prosody)
+                    nested_context = _Context(
+                        resolved,
+                        True,
+                        context.voice,
+                        context.prosody,
+                        context.direction,
+                    )
                 walk(element, nested_context, depth + 1)
             elif tag in {"token", "w"}:
                 _require_attributes(element, set())
@@ -710,6 +776,7 @@ def validate_ssml(
     resolve_language: LanguageResolver | None = None,
     validate_voice: VoiceValidator | None = None,
     render_phoneme: PhonemeRenderer | None = None,
+    allow_turn_direction: bool = False,
 ) -> SSMLPlan:
     """Validate and compile a document into an immutable synthesis plan."""
 
@@ -721,6 +788,7 @@ def validate_ssml(
         resolve_language=resolve_language,
         validate_voice=validate_voice,
         render_phoneme=render_phoneme,
+        allow_turn_direction=allow_turn_direction,
     )
 
 
@@ -728,6 +796,7 @@ def ssml_capabilities(
     *,
     phoneme_alphabets: tuple[str, ...] = (),
     description_supported: bool = True,
+    turn_direction_supported: bool = False,
 ) -> dict:
     return {
         "input_types": ["text", "ssml", "ssml-h"],
@@ -759,6 +828,12 @@ def ssml_capabilities(
             "extensions": ["voice-definition", "description", "sample"],
             "voice_scopes": ["request", "profile"],
             "description_supported": description_supported,
+            "turn_direction": {
+                "supported": turn_direction_supported,
+                "attribute": "h:direction",
+                "element": "voice",
+                "max_characters": MAX_TURN_DIRECTION_CHARACTERS,
+            },
             "specification": "https://hangrylabs.app/ns/ssml-h/1.0",
         },
         "limits": {
@@ -770,5 +845,6 @@ def ssml_capabilities(
             "break_ms": MAX_BREAK_MS,
             "total_break_ms": MAX_TOTAL_BREAK_MS,
             "voice_sample_characters": MAX_VOICE_SAMPLE_CHARACTERS,
+            "turn_direction_characters": MAX_TURN_DIRECTION_CHARACTERS,
         },
     }

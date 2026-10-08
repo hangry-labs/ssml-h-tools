@@ -5,8 +5,10 @@ import unittest
 from ssml_h import (
     MAX_BREAK_MS,
     MAX_SSML_NESTING,
+    MAX_TURN_DIRECTION_CHARACTERS,
     SSML_H_NAMESPACE,
     SSMLValidationError,
+    ssml_capabilities,
     validate_ssml,
 )
 
@@ -70,6 +72,73 @@ class ParserTests(unittest.TestCase):
         </speak>"""
         with self.assertRaisesRegex(SSMLValidationError, "input_type='ssml-h'"):
             validate_ssml(document, "ssml")
+
+    def test_ssml_h_turn_direction_is_capability_gated_and_normalized(self) -> None:
+        document = f"""<speak version="1.1" xmlns="http://www.w3.org/2001/10/synthesis"
+            xmlns:h="{SSML_H_NAMESPACE}">
+          <voice name="Host" h:direction="  Bright   and delighted  ">
+            Opening. <prosody rate="slow">Measured detail.</prosody>
+            <voice name="Guest">A separate voice.</voice> Closing.
+          </voice>
+        </speak>"""
+
+        with self.assertRaisesRegex(SSMLValidationError, "not enabled"):
+            validate_ssml(document, "ssml-h", validate_voice=lambda _name, _definitions: None)
+
+        plan = validate_ssml(
+            document,
+            "ssml-h",
+            validate_voice=lambda _name, _definitions: None,
+            allow_turn_direction=True,
+        )
+
+        self.assertEqual(
+            [(unit.voice, unit.direction) for unit in plan.units],
+            [
+                ("Host", "Bright and delighted"),
+                ("Host", "Bright and delighted"),
+                ("Guest", None),
+                ("Host", "Bright and delighted"),
+            ],
+        )
+
+    def test_turn_direction_rejects_invalid_mode_namespace_and_bounds(self) -> None:
+        namespaced = (
+            f'<speak xmlns:h="{SSML_H_NAMESPACE}">'
+            '<voice name="Host" h:direction="Calm">Hello.</voice></speak>'
+        )
+        with self.assertRaisesRegex(SSMLValidationError, "requires input_type='ssml-h'"):
+            validate_ssml(namespaced, "ssml", allow_turn_direction=True)
+
+        bare = '<speak version="1.1"><voice name="Host" direction="Calm">Hello.</voice></speak>'
+        with self.assertRaisesRegex(SSMLValidationError, "Unsupported attribute"):
+            validate_ssml(bare, "ssml-h", allow_turn_direction=True)
+
+        empty = (
+            f'<speak version="1.1" xmlns:h="{SSML_H_NAMESPACE}">'
+            '<voice name="Host" h:direction="  ">Hello.</voice></speak>'
+        )
+        with self.assertRaisesRegex(SSMLValidationError, "must not be empty"):
+            validate_ssml(empty, "ssml-h", allow_turn_direction=True)
+
+        oversized = "x" * (MAX_TURN_DIRECTION_CHARACTERS + 1)
+        too_long = (
+            f'<speak version="1.1" xmlns:h="{SSML_H_NAMESPACE}">'
+            f'<voice name="Host" h:direction="{oversized}">Hello.</voice></speak>'
+        )
+        with self.assertRaisesRegex(SSMLValidationError, "limited"):
+            validate_ssml(too_long, "ssml-h", allow_turn_direction=True)
+
+    def test_capabilities_report_turn_direction_opt_in(self) -> None:
+        disabled = ssml_capabilities()
+        enabled = ssml_capabilities(turn_direction_supported=True)
+
+        self.assertFalse(disabled["ssml_h"]["turn_direction"]["supported"])
+        self.assertTrue(enabled["ssml_h"]["turn_direction"]["supported"])
+        self.assertEqual(
+            enabled["limits"]["turn_direction_characters"],
+            MAX_TURN_DIRECTION_CHARACTERS,
+        )
 
     def test_language_voice_and_nested_prosody_are_inherited(self) -> None:
         plan = validate_ssml(

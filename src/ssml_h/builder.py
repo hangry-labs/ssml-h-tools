@@ -6,6 +6,7 @@ from typing import Literal
 from xml.etree import ElementTree as ET
 
 from .parser import (
+    MAX_TURN_DIRECTION_CHARACTERS,
     SSML_H_NAMESPACE,
     SSML_NAMESPACE,
     XML_LANGUAGE_ATTRIBUTE,
@@ -56,8 +57,9 @@ class VoiceDefinition:
 class SSMLNode:
     """A synthesis node used to build nested SSML content safely."""
 
-    def __init__(self, element: ET.Element):
+    def __init__(self, element: ET.Element, input_type: Literal["ssml", "ssml-h"] = "ssml"):
         self._element = element
+        self._input_type = input_type
 
     def __enter__(self) -> SSMLNode:
         return self
@@ -70,7 +72,10 @@ class SSMLNode:
         return self
 
     def _child(self, tag: str, attributes: dict[str, str] | None = None) -> SSMLNode:
-        return SSMLNode(ET.SubElement(self._element, _qname(tag), attributes or {}))
+        return SSMLNode(
+            ET.SubElement(self._element, _qname(tag), attributes or {}),
+            self._input_type,
+        )
 
     def paragraph(self, *, language: str | None = None) -> SSMLNode:
         attributes = {XML_LANGUAGE_ATTRIBUTE: language} if language else {}
@@ -83,10 +88,27 @@ class SSMLNode:
     def token(self) -> SSMLNode:
         return self._child("token")
 
-    def voice(self, name: str, *, required: str | None = None) -> SSMLNode:
+    def voice(
+        self,
+        name: str,
+        *,
+        required: str | None = None,
+        direction: str | None = None,
+    ) -> SSMLNode:
         attributes = {"name": name}
         if required is not None:
             attributes["required"] = required
+        if direction is not None:
+            if self._input_type != "ssml-h":
+                raise ValueError("Turn direction requires input_type='ssml-h'.")
+            normalized = " ".join(direction.split()).strip()
+            if not normalized:
+                raise ValueError("direction must not be empty.")
+            if len(normalized) > MAX_TURN_DIRECTION_CHARACTERS:
+                raise ValueError(
+                    f"direction is limited to {MAX_TURN_DIRECTION_CHARACTERS} characters."
+                )
+            attributes[_qname("direction", SSML_H_NAMESPACE)] = normalized
         return self._child("voice", attributes)
 
     def language(self, language: str) -> SSMLNode:
@@ -169,7 +191,7 @@ class SSMLBuilder(SSMLNode):
             attributes[XML_LANGUAGE_ATTRIBUTE] = language
         self.input_type = input_type
         self._definitions: list[VoiceDefinition] = []
-        super().__init__(ET.Element(_qname("speak"), attributes))
+        super().__init__(ET.Element(_qname("speak"), attributes), input_type)
 
     @classmethod
     def ssml_h(cls, *, language: str | None = None) -> SSMLBuilder:

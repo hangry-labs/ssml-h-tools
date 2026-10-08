@@ -54,6 +54,25 @@ class BuilderTests(unittest.TestCase):
         self.assertEqual(plan.voice_definitions[0].scope, "request")
         self.assertNotIn("replace=", document.build())
 
+    def test_builds_namespaced_turn_direction(self) -> None:
+        document = SSMLBuilder.ssml_h(language="en-US")
+        with document.voice("Host", direction="  Calm   and authoritative  ") as host:
+            host.text("Welcome back.")
+
+        xml = document.build()
+        plan = document.validate(
+            allow_turn_direction=True,
+            validate_voice=lambda _name, _definitions: None,
+        )
+
+        self.assertIn('h:direction="Calm and authoritative"', xml)
+        self.assertEqual(plan.units[0].direction, "Calm and authoritative")
+
+    def test_turn_direction_builder_requires_ssml_h(self) -> None:
+        document = SSMLBuilder()
+        with self.assertRaisesRegex(ValueError, "requires input_type='ssml-h'"):
+            document.voice("Host", direction="Calm")
+
     def test_rejects_invalid_break_builder_arguments(self) -> None:
         document = SSMLBuilder()
         with self.assertRaisesRegex(ValueError, "exactly one"):
