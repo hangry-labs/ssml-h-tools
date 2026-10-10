@@ -73,6 +73,17 @@ class BuilderTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "requires input_type='ssml-h'"):
             document.voice("Host", direction="Calm")
 
+    def test_builds_direction_only_sentence(self) -> None:
+        document = SSMLBuilder.ssml_h(language="en-US")
+        document.sentence(direction="  Low and thoughtful  ").text("A new voice.")
+
+        xml = document.build()
+        plan = document.validate(allow_turn_direction=True)
+
+        self.assertIn('h:direction="Low and thoughtful"', xml)
+        self.assertIsNone(plan.units[0].voice)
+        self.assertEqual(plan.units[0].direction, "Low and thoughtful")
+
     def test_rejects_invalid_break_builder_arguments(self) -> None:
         document = SSMLBuilder()
         with self.assertRaisesRegex(ValueError, "exactly one"):

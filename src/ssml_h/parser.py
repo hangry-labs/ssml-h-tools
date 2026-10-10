@@ -193,10 +193,12 @@ def _require_attributes(element, allowed: set[str]) -> dict[str, str]:
     return attributes
 
 
-def _voice_attributes(
+def _turn_attributes(
     element,
     input_type: Literal["ssml", "ssml-h"],
     allow_turn_direction: bool,
+    allowed: set[str],
+    element_name: str,
 ) -> tuple[dict[str, str], str | None]:
     direction: str | None = None
     standard_attributes: dict[str, str] = {}
@@ -218,11 +220,16 @@ def _voice_attributes(
                 )
             continue
         if namespace:
+            if namespace == XML_NAMESPACE:
+                standard_attributes[name] = value
+                continue
             raise SSMLValidationError(f"Unsupported namespaced attribute '{name}'.")
         standard_attributes[local] = value
-    unknown = sorted(set(standard_attributes) - {"name", "required"})
+    unknown = sorted(set(standard_attributes) - allowed)
     if unknown:
-        raise SSMLValidationError(f"Unsupported attribute(s) on <voice>: {', '.join(unknown)}.")
+        raise SSMLValidationError(
+            f"Unsupported attribute(s) on <{element_name}>: {', '.join(unknown)}."
+        )
     return standard_attributes, direction
 
 
@@ -641,10 +648,12 @@ def compile_ssml(
                     )
                 )
             elif tag == "voice":
-                attributes, direction = _voice_attributes(
+                attributes, direction = _turn_attributes(
                     element,
                     input_type,
                     allow_turn_direction,
+                    {"name", "required"},
+                    "voice",
                 )
                 name = attributes.get("name", "").strip()
                 if not name:
@@ -686,9 +695,21 @@ def compile_ssml(
             elif tag == "prosody":
                 walk(element, _prosody_context(element, context), depth + 1)
             elif tag in {"p", "s"}:
-                _require_attributes(element, {XML_LANGUAGE_ATTRIBUTE})
+                if tag == "s":
+                    attributes, direction = _turn_attributes(
+                        element,
+                        input_type,
+                        allow_turn_direction,
+                        {XML_LANGUAGE_ATTRIBUTE},
+                        "s",
+                    )
+                    if XML_DIRECTION_ATTRIBUTE not in element.attrib:
+                        direction = context.direction
+                else:
+                    attributes = _require_attributes(element, {XML_LANGUAGE_ATTRIBUTE})
+                    direction = context.direction
                 nested_context = context
-                nested_language = element.attrib.get(XML_LANGUAGE_ATTRIBUTE, "").strip()
+                nested_language = attributes.get(XML_LANGUAGE_ATTRIBUTE, "").strip()
                 if nested_language:
                     try:
                         resolved = (
@@ -703,7 +724,15 @@ def compile_ssml(
                         True,
                         context.voice,
                         context.prosody,
-                        context.direction,
+                        direction,
+                    )
+                elif direction != context.direction:
+                    nested_context = _Context(
+                        context.language,
+                        context.language_explicit,
+                        context.voice,
+                        context.prosody,
+                        direction,
                     )
                 walk(element, nested_context, depth + 1)
             elif tag in {"token", "w"}:
@@ -831,7 +860,7 @@ def ssml_capabilities(
             "turn_direction": {
                 "supported": turn_direction_supported,
                 "attribute": "h:direction",
-                "element": "voice",
+                "elements": ["voice", "s"],
                 "max_characters": MAX_TURN_DIRECTION_CHARACTERS,
             },
             "specification": "https://hangrylabs.app/ns/ssml-h/1.0",

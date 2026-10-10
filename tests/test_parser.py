@@ -102,6 +102,17 @@ class ParserTests(unittest.TestCase):
             ],
         )
 
+    def test_ssml_h_direction_can_design_the_default_voice_for_a_sentence(self) -> None:
+        document = f'''<speak version="1.1" xmlns="http://www.w3.org/2001/10/synthesis"
+            xmlns:h="{SSML_H_NAMESPACE}">
+          <s h:direction="  Warm   middle-aged narrator  ">Welcome aboard.</s>
+        </speak>'''
+
+        plan = validate_ssml(document, "ssml-h", allow_turn_direction=True)
+
+        self.assertIsNone(plan.units[0].voice)
+        self.assertEqual(plan.units[0].direction, "Warm middle-aged narrator")
+
     def test_turn_direction_rejects_invalid_mode_namespace_and_bounds(self) -> None:
         namespaced = (
             f'<speak xmlns:h="{SSML_H_NAMESPACE}">'
@@ -135,6 +146,7 @@ class ParserTests(unittest.TestCase):
 
         self.assertFalse(disabled["ssml_h"]["turn_direction"]["supported"])
         self.assertTrue(enabled["ssml_h"]["turn_direction"]["supported"])
+        self.assertEqual(enabled["ssml_h"]["turn_direction"]["elements"], ["voice", "s"])
         self.assertEqual(
             enabled["limits"]["turn_direction_characters"],
             MAX_TURN_DIRECTION_CHARACTERS,

@@ -48,8 +48,9 @@ Set `allow_turn_direction=True` only when the active processor can execute a
 bounded natural-language delivery instruction. Each affected speech unit then
 carries `unit.direction`. The host must preserve the resolved voice, must not
 speak or persist the instruction, and must reject model conditioning
-combinations it cannot honor. A nested `<voice>` has no direction unless it
-declares its own namespaced `h:direction` attribute.
+combinations it cannot honor. The attribute is valid on `<voice>` and `<s>`;
+the latter directs the host's default voice binding. A nested `<voice>` has no
+direction unless it declares its own namespaced `h:direction` attribute.
 
 ## Execution boundary
 

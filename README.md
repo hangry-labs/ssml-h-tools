@@ -84,7 +84,8 @@ Per-turn natural-language direction is an optional processor capability. The
 parser rejects `h:direction` unless the host explicitly passes
 `allow_turn_direction=True`; compiled speech units then expose the normalized
 instruction as `unit.direction`. The builder emits the namespaced attribute
-through `voice(..., direction="...")` only for SSML-H documents.
+through `voice(..., direction="...")` for named voices or
+`sentence(direction="...")` for the default voice, only in SSML-H documents.
 
 ## Processor adapters
 

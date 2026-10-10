@@ -36,6 +36,22 @@ def _append_text(element: ET.Element, value: str) -> None:
         element.text = (element.text or "") + value
 
 
+def _direction_attribute(
+    input_type: Literal["ssml", "ssml-h"],
+    direction: str | None,
+) -> dict[str, str]:
+    if direction is None:
+        return {}
+    if input_type != "ssml-h":
+        raise ValueError("Turn direction requires input_type='ssml-h'.")
+    normalized = " ".join(direction.split()).strip()
+    if not normalized:
+        raise ValueError("direction must not be empty.")
+    if len(normalized) > MAX_TURN_DIRECTION_CHARACTERS:
+        raise ValueError(f"direction is limited to {MAX_TURN_DIRECTION_CHARACTERS} characters.")
+    return {_qname("direction", SSML_H_NAMESPACE): normalized}
+
+
 @dataclass(frozen=True)
 class VoiceDefinition:
     name: str
@@ -81,8 +97,14 @@ class SSMLNode:
         attributes = {XML_LANGUAGE_ATTRIBUTE: language} if language else {}
         return self._child("p", attributes)
 
-    def sentence(self, *, language: str | None = None) -> SSMLNode:
+    def sentence(
+        self,
+        *,
+        language: str | None = None,
+        direction: str | None = None,
+    ) -> SSMLNode:
         attributes = {XML_LANGUAGE_ATTRIBUTE: language} if language else {}
+        attributes.update(_direction_attribute(self._input_type, direction))
         return self._child("s", attributes)
 
     def token(self) -> SSMLNode:
@@ -98,17 +120,7 @@ class SSMLNode:
         attributes = {"name": name}
         if required is not None:
             attributes["required"] = required
-        if direction is not None:
-            if self._input_type != "ssml-h":
-                raise ValueError("Turn direction requires input_type='ssml-h'.")
-            normalized = " ".join(direction.split()).strip()
-            if not normalized:
-                raise ValueError("direction must not be empty.")
-            if len(normalized) > MAX_TURN_DIRECTION_CHARACTERS:
-                raise ValueError(
-                    f"direction is limited to {MAX_TURN_DIRECTION_CHARACTERS} characters."
-                )
-            attributes[_qname("direction", SSML_H_NAMESPACE)] = normalized
+        attributes.update(_direction_attribute(self._input_type, direction))
         return self._child("voice", attributes)
 
     def language(self, language: str) -> SSMLNode:

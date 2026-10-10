@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.3.0 - 2026-10-10
+
+- Allow capability-gated `h:direction` on `<s>` to design or direct the
+  processor's default voice without first naming a voice.
+- Add `sentence(direction=...)` builder support and advertise both supported
+  direction-bearing elements through capability discovery.
+
 ## 0.2.0 - 2026-10-08
 
 - Add capability-gated SSML-H `h:direction` parsing for individual voice turns.
