@@ -860,6 +860,7 @@ def ssml_capabilities(
             "turn_direction": {
                 "supported": turn_direction_supported,
                 "attribute": "h:direction",
+                "element": "voice",
                 "elements": ["voice", "s"],
                 "max_characters": MAX_TURN_DIRECTION_CHARACTERS,
             },

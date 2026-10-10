@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.3.1 - 2026-10-10
+
+- Preserve the singular `turn_direction.element` capability field for 0.2.x
+  consumers while advertising the expanded support through `elements`.
+
 ## 0.3.0 - 2026-10-10
 
 - Allow capability-gated `h:direction` on `<s>` to design or direct the

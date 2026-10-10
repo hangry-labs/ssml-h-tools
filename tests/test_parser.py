@@ -146,6 +146,7 @@ class ParserTests(unittest.TestCase):
 
         self.assertFalse(disabled["ssml_h"]["turn_direction"]["supported"])
         self.assertTrue(enabled["ssml_h"]["turn_direction"]["supported"])
+        self.assertEqual(enabled["ssml_h"]["turn_direction"]["element"], "voice")
         self.assertEqual(enabled["ssml_h"]["turn_direction"]["elements"], ["voice", "s"])
         self.assertEqual(
             enabled["limits"]["turn_direction_characters"],
